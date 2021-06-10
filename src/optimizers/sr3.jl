@@ -83,7 +83,7 @@ function (opt::SR3{T,V,R})(X, A, Y, λ::V = first(opt.λ);
        iters += 1
 
        # Solve ridge regression
-       X .= H \ (X̂ .+ W*ν) 
+       X .= H \ (X̂ .+ W*ν)
        #ldiv!(X, H, X̂ .+ W*ν)
        # Proximal
        opt.R(W, X, λ)
@@ -121,6 +121,6 @@ function (opt::SR3{T,V,R})(X, A, Y, λ::V = first(opt.λ);
    end
    # We really search for W here
    X .= W
-   @views clip_by_threshold!(X, λ)
+   @views clip_by_threshold!(X, λ; kwargs...)
    return
 end

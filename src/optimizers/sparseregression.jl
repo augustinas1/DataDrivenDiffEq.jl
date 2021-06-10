@@ -22,7 +22,7 @@ function sparse_regression!(X, A, Y, opt::AbstractOptimizer{T};
         progress = nothing
     end
 
-    @views opt(X, A, Y, λ, maxiter = maxiter, abstol = abstol, progress = progress)
+    @views opt(X, A, Y, λ, maxiter = maxiter, abstol = abstol, progress = progress; kwargs...)
 
     return
 end
@@ -58,7 +58,7 @@ function sparse_regression!(X, A, Y, opt::AbstractOptimizer{T};
 
     @views for (i,λi) in enumerate(λ)
         init!(X_tmp, opt, A, Y)
-        opt(X_tmp, A, Y, λi, maxiter = maxiter, abstol = abstol, f = f, g = g)
+        opt(X_tmp, A, Y, λi, maxiter = maxiter, abstol = abstol, f = f, g = g; kwargs...)
         # Increasing the threshold makes no sense
         all(X_tmp .== zero(eltype(X))) && break
 
@@ -83,9 +83,9 @@ function sparse_regression!(X, A, Y, opt::AbstractOptimizer{T};
             )
         end
     end
-    
+
     for i in 1:size(Y, 2)
-        @views clip_by_threshold!(X[:, i], λs[i])
+        @views clip_by_threshold!(X[:, i], λs[i]; kwargs...)
     end
 
     return λs

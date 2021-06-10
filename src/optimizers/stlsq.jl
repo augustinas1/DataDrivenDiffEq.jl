@@ -103,6 +103,6 @@ function (opt::STLSQ{T})(X, A, Y, λ::U = first(opt.λ);
         end
     end
 
-    clip_by_threshold!(X, λ)
+    clip_by_threshold!(X, λ; kwargs...)
     return
 end
