@@ -8,10 +8,14 @@ using LinearAlgebra
 using DiffEqBase
 using ModelingToolkit
 
+using Distributions
 using QuadGK
 using Statistics
 using DataInterpolations
 
+
+using Requires
+using ProgressMeter
 using Reexport
 using Compat
 using DocStringExtensions
@@ -19,6 +23,7 @@ using DocStringExtensions
 
 @reexport using ModelingToolkit: states, parameters, independent_variable, observed, controls
 @reexport using DataInterpolations: ConstantInterpolation, LinearInterpolation, QuadraticInterpolation, LagrangeInterpolation, QuadraticSpline, CubicSpline, BSplineInterpolation, BSplineApprox, Curvefit
+using Symbolics: scalarize
 
 using ModelingToolkit: AbstractSystem
 # Basis and Koopman
@@ -31,9 +36,14 @@ abstract type CollocationKernel end
 # Algortihms for Koopman
 abstract type AbstractKoopmanAlgorithm end
 
+# Abstract symbolic_regression
+abstract type AbstractSymbolicRegression end
+
 # Problem and solution
-abstract type AbstractDataDrivenProblem end
+abstract type AbstractDataDrivenProblem{dType, cType, probType} end
 abstract type AbstractDataDrivenSolution end
+
+
 
 
 ## Basis
@@ -80,12 +90,29 @@ export update!
 include("./koopman/algorithms.jl")
 export DMDPINV, DMDSVD, TOTALDMD
 
+
 ## Problem and Solution
+# Use to distinguish the problem types
+@enum DDProbType begin
+    Direct=1 # Direct problem without further information
+    Discrete=2 # Time discrete problem
+    Continuous=3 # Time continous problem
+end
+
+
+# Define some alias type for easier dispatch
+const AbstractDirectProb{N,C} = AbstractDataDrivenProblem{N,C,DDProbType(1)}
+const AbstractDiscreteProb{N,C} = AbstractDataDrivenProblem{N,C,DDProbType(2)}
+const AbstracContProb{N,C} = AbstractDataDrivenProblem{N,C,DDProbType(3)}
+
+
 include("./problem.jl")
+
 export DataDrivenProblem
-export DiscreteDataDrivenProblem, ContinuousDataDrivenProblem
-export has_timepoints, has_inputs, has_observations, has_derivatives
+export DiscreteDataDrivenProblem, ContinuousDataDrivenProblem, DirectDataDrivenProblem
+export is_autonomous, is_discrete, is_direct, is_continuous, is_parametrized, has_timepoints
 export is_valid
+
 
 include("./solution.jl")
 export DataDrivenSolution
@@ -96,75 +123,32 @@ include("./solve/sindy.jl")
 include("./solve/koopman.jl")
 export solve
 
-##
+# Optional
+function __init__()
+    # Load and export OccamNet
+    @require Flux="587475ba-b771-5e3f-ad9e-33799f191a9c" begin
 
-#include("./optimizers/Optimize.jl")
-#using .Optimize
-#
-#export set_threshold!, set_threshold
-#export STRRidge, ADMM, SR3
-#
-#export ADM
+        using .Flux
+        include("./symbolic_regression/occamnet.jl")
 
+        export OccamNet,ProbabilityLayer
+        export set_temp!
+        export probability, logprobability
+        export probabilities, logprobabilities
+        export OccamSR
 
-#abstract type AbstractKoopmanOperator <: Function end;
-#include("./koopman/algorithms.jl")
-#export DMDPINV, DMDSVD, TOTALDMD
-#
-#include("./koopman/koopman.jl")
-#export eigen, eigvals, eigvecs
-#export modes, frequencies
-#export is_discrete, is_continuous
-#export operator, generator
-#export inputmap, outputmap, updatable, isstable
-#
-#include("./koopman/linearkoopman.jl")
-#export LinearKoopman, update!
-#
-#include("./koopman/nonlinearkoopman.jl")
-#export NonlinearKoopman, reduce_basis
-#
-#include("./koopman/exact_dmd.jl")
-#export DMD, gDMD
-#
-#include("./koopman/dmdc.jl")
-#export DMDc, gDMDc
-#
-#include("./koopman/extended_dmd.jl")
-#export EDMD, gEDMD
-#
-#include("./sindy/results.jl")
-#export SparseIdentificationResult
-#export print_equations
-#export get_coefficients, get_error, get_sparsity, get_aicc
-#
-#include("./sindy/sindy.jl")
-#export SINDy
-#export sparse_regression, sparse_regression!
-#
-#function SInDy(Y, X, basis; opt = STRRidge(), kwargs...)
-#    @warn("SInDy has been deprecated. Use SINDy to recover the same functionality.")
-#    SINDy(Y, X, basis, opt; kwargs...)
-#end
-#
-#function ISInDy(Y, X, basis; opt = ADM(), kwargs...)
-#    @warn("ISInDy has been deprecated. Use ISINDy to recover the same functionality.")
-#    ISINDy(Y, X, basis, opt; kwargs...)
-#end
-#
-#export SInDy, ISInDy
-#
-#include("./sindy/isindy.jl")
-#export ISINDy
+        @info "DataDrivenDiffEq : OccamNet is available."
+    end
 
-#include("./system_conversions.jl")
+    @require SymbolicRegression = "8254be44-1295-4e6a-a16d-46603ac705cb" begin
 
-#include("./utils.jl")
-#export AIC, AICC, BIC
-#export optimal_shrinkage, optimal_shrinkage!
-#export savitzky_golay
-#export burst_sampling, subsample
+        using .SymbolicRegression
+        include("./symbolic_regression/symbolic_regression.jl")
+        export EQSearch
 
+        @info "DataDrivenDiffEq : Symboolic Regression is available."
+    end
 
+end
 
 end # module

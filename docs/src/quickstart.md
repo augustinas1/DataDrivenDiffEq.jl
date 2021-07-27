@@ -29,16 +29,15 @@ savefig("DMD_Example_1.png") # hide
 To estimate the underlying operator in the states ``u_1, u_2``, we simply define a discrete [`DataDrivenProblem`](@ref) using the measurements and time and `solve` the estimation problem using the [`DMDSVD`](@ref) algorithm for approximating the operator.
 
 ```@example 4
-X = Array(sol)
 
-prob = DiscreteDataDrivenProblem(X, t = sol.t)
+prob = DiscreteDataDrivenProblem(sol)
 
 res = solve(prob, DMDSVD(), digits = 1)
 system = result(res)
 println(system) # hide
 ```
 
-The [`DataDrivenSolution`](@ref) contains an explicit result which is a [`Koopman`](@ref), defining all necessary information, e.g. the associated operator (which corresponds to our abefore defined matrix ``A``).
+The [`DataDrivenSolution`](@ref) contains an explicit result which is a [`Koopman`](@ref), defining all necessary information, e.g. the associated operator (which corresponds to our matrix ``A``).
 
 ```@example 4
 Matrix(system)
@@ -49,11 +48,11 @@ In general, we can skip the expensive progress of deriving a callable symbolic s
 res = solve(prob, DMDSVD(), digits = 1, operator_only = true)
 ```
 
-Where `K` is the associated operator given as its eigendecomposition, `B` is a possible mapping of inputs onto the states, `C` is the linear mapping from the lifted observeables back onto the original states and `Q` and `P` are used for updating the operator.
+Where `K` is the associated operator given as its eigendecomposition, `B` is a possible mapping of inputs onto the states, `C` is the linear mapping from the lifted observables back onto the original states and `Q` and `P` are used for updating the operator.
 
 ## Nonlinear System with Extended Dynamic Mode Decomposition
 
-Similarly, we can use the [Extended Dynamic Mode Decomposition](https://link.springer.com/article/10.1007/s00332-015-9258-5) via a nonlinear [`Basis`](@ref) of observeables. Here, we look a rather [famous example](https://arxiv.org/pdf/1510.03007.pdf) with a finite dimensional solution.
+Similarly, we can use the [Extended Dynamic Mode Decomposition](https://link.springer.com/article/10.1007/s00332-015-9258-5) via a nonlinear [`Basis`](@ref) of observeables. Here, we will look at a rather [famous example](https://arxiv.org/pdf/1510.03007.pdf) with a finite dimensional solution.
 
 ```@example 3
 using DataDrivenDiffEq
@@ -78,7 +77,7 @@ savefig("EDMD_Example_1.png") # hide
 ```
 ![](EDMD_Example_1.png)
 
-Since we are dealing with an continuous system in time, we define the associated [`DataDrivenProblem`](@ref) accordingly using the measured states `X`, their derivates `DX` and the time `t`.
+Since we are dealing with an continuous system in time, we define the associated [`DataDrivenProblem`](@ref) accordingly using the measured states `X`, their derivatives `DX` and the time `t`.
 
 ```@example 3
 prob = ContinuousDataDrivenProblem(solution)
@@ -105,7 +104,7 @@ operator(system)
 
 ## Nonlinear Systems - Sparse Identification of Nonlinear Dynamics
 
-To find the underlying system without any [`Algortihms`](@ref koopman_algorithms) related to Koopman operator theory, we can use  [Sparse Identification of Nonlinear Dynamics](https://www.pnas.org/content/113/15/3932) - SINDy for short. As the name suggests, it finds the sparsest basis of functions which build the observed trajectory. Again, we will start with a nonlinear system
+To find the underlying system without any [`Algorithms`](@ref koopman_algorithms) related to Koopman operator theory, we can use  [Sparse Identification of Nonlinear Dynamics](https://www.pnas.org/content/113/15/3932) - SINDy for short. As the name suggests, it finds the sparsest basis of functions which build the observed trajectory. Again, we will start with a nonlinear system:
 
 ```@example 1
 using DataDrivenDiffEq
@@ -114,8 +113,9 @@ using ModelingToolkit
 using OrdinaryDiffEq
 using Plots
 using Random
+using Symbolics: scalarize
 
-Random.seed!(1111) # Due to the noise
+Random.seed!(1111) # For the noise
 
 # Create a nonlinear pendulum
 function pendulum(u, p, t)
@@ -166,8 +166,11 @@ and returns a pareto optimal solution of the underlying [`sparse_regression!`](@
 ```@example 1
 @variables u[1:2] c[1:1]
 @parameters w[1:2]
+u = scalarize(u)
+c = scalarize(c)
+w = scalarize(w)
 
-h = Num[sin(w[1]*u[1]);cos(w[2]*u[1]); polynomial_basis(u, 5); c]
+h = Num[sin.(w[1].*u[1]);cos.(w[2].*u[1]); polynomial_basis(u, 5); c]
 
 basis = Basis(h, u, parameters = w, controls = c)
 
@@ -180,7 +183,7 @@ println(res) # hide
 !!! info
     A more detailed description of the result can be printed via `print(res, Val{true})`, which also includes the discovered equations and parameter values.
 
-Where the resulting [`DataDrivenSolution`](@ref) stores information about the infered model and the parameters:
+Where the resulting [`DataDrivenSolution`](@ref) stores information about the inferred model and the parameters:
 
 ```@example 1
 system = result(res);
@@ -248,7 +251,7 @@ for (i, xi) in enumerate(eachcol(X))
     DX[:, i] = michaelis_menten(xi, [], ts[i])
 end
 
-prob = ContinuousDataDrivenProblem(X, ts, DX = DX)
+prob = ContinuousDataDrivenProblem(X, ts, DX)
 
 p1 = plot(ts, X', label = ["Measurement" nothing], color = :black, style = :dash, legend = :bottomleft, ylabel ="Measurement") # hide
 p2 = plot(ts, DX', label = nothing, color = :black, style = :dash, ylabel = "Derivative", xlabel = "Time [s]") # hide
@@ -276,7 +279,7 @@ println(res) # hide
 As we can see, the [`DataDrivenSolution`](@ref) already has good metrics. Inspection of the underlying system shows that the original equations have been recovered correctly:
 
 ```@example 2
-system = result(res); # hide
+system = result(res); 
 println(system)
 ```
 
@@ -285,9 +288,9 @@ println(system)
 
 ## Implicit Nonlinear Dynamics : Cartpole
 
-The following is another example on how to use the [`ImplicitOptimizer`](@ref) and is taken from the [original paper](https://royalsocietypublishing.org/doi/10.1098/rspa.2020.0279). 
+The following is another example on how to use the [`ImplicitOptimizer`](@ref) and is taken from the [original paper](https://royalsocietypublishing.org/doi/10.1098/rspa.2020.0279).
 
-As always, we start by creating a corresponding dataset.
+As always, we start by creating a corresponding dataset:
 
 ```@example 5
 using DataDrivenDiffEq
@@ -331,10 +334,18 @@ savefig("SINDy_Example_Data_3.png") # hide
 ```
 ![](SINDy_Example_Data_3.png)
 
-Next, we define a sufficient [`Basis`](@ref)
+Next, we define a sufficient [`Basis`](@ref):
 
 ```@example 5
+using Symbolics: scalarize
+
 @variables u[1:4] du[1:2] x[1:1] t
+
+# Right now, we need to scalarize the array expression to combine them
+u = scalarize(u)
+du = scalarize(du)
+x = scalarize(x)
+
 polys = polynomial_basis(u, 2)
 push!(polys, sin.(u[1]))
 push!(polys, cos.(u[1]))
@@ -354,10 +365,10 @@ basis= Basis(implicits, [u; du], controls = x,  iv = t);
 println(basis) # hide
 ```
 
-And solve the problem by varying over a sufficient set of thresholds for the associated optimizer.
+We solve the problem by varying over a sufficient set of thresholds for the associated optimizer.
 Additionally we activate the `scale_coefficients` option for the [`ImplicitOptimizer](@ref), which helps to find sparse equations by normalizing the resulting coefficient matrix after each suboptimization.
 
-To evaluate the pareto optimal solution over, we use the functions `f` and `g` which can be passed as keyworded arguements into the `solve` function. `f` is a function with different signatures for different optimizers, but returns the ``L_0`` norm of the coefficients and the ``L_2`` error of the current model. `g` takes this vector and projects it down onto a scalar, using the ``L_2`` norm per default. However, here we want to use the `AIC`  of the output of `f`. A noteworthy exception is of course, that we want only results with two or more active coefficents. Hence we modify `g` accordingly.
+To evaluate the pareto optimal solution, we use the functions `f` and `g` which can be passed as keyworded arguements into the `solve` function. `f` is a function with different signatures for different optimizers, but returns the ``L_0`` norm of the coefficients and the ``L_2`` error of the current model. `g` takes this vector and projects it down onto a scalar, using the ``L_2`` norm per default. However, here we want to use the `AIC`  of the output of `f`. A noteworthy exception is of course, that we want only results with two or more active coefficents. Hence we modify `g` accordingly.
 
 ```@example 5
 λ = [1e-4;5e-4;1e-3;2e-3;3e-3;4e-3;5e-3;6e-3;7e-3;8e-3;9e-3;1e-2;2e-2;3e-2;4e-2;5e-2;

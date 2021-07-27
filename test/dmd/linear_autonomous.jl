@@ -1,8 +1,3 @@
-using DataDrivenDiffEq
-using LinearAlgebra
-using OrdinaryDiffEq
-using Test
-
 @testset "Linear Discrete System" begin
     # Create some linear data
     A = [0.9 -0.2; 0.0 0.2]
@@ -34,7 +29,7 @@ end
     u0 = [10.0; -20.0]
     prob = ODEProblem(f, u0, (0.0, 10.0))
     sol = solve(prob, Tsit5(), saveat = 0.001)
-    
+
     prob = DataDrivenProblem(sol)
 
     for alg in [DMDPINV(), DMDSVD(), TOTALDMD()]
@@ -45,7 +40,7 @@ end
         @test isempty(estimator.B)
         res = solve(prob, alg , operator_only = false)
         m = metrics(res)
-        @test m.Error ./ size(X, 2) < 3e-1
+        @test m.Error ./ size(sol, 2) < 3e-1
         @test Matrix(result(res)) ≈ Matrix(estimator.K)
     end
 end
@@ -72,6 +67,16 @@ end
         @test Q*K̃*Q' ≈ K atol = 1e-1
         @test m.Error / size(X, 2) < 1e-2
     end
+end
+
+@testset "Big System" begin
+    # Creates a big system which would resulting in a segfault otherwise
+    X = rand([0, 1], 128, 936);
+    T = collect(LinRange(0, 4.367058580858928, 936));
+    problem = DiscreteDataDrivenProblem(X, T);
+    res1 = solve(problem, DMDSVD(), eval_expression = true)
+    res2 = solve(problem, DMDSVD(), operator_only = true)
+    @test Matrix(result(res1)) == real.(Matrix(res2.K))
 end
 
 # TODO Include the Big System test
